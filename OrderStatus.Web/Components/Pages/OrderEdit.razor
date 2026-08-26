@@ -1,0 +1,179 @@
+@page "/orders/new"
+@page "/orders/edit/{Id:int}"
+@using Microsoft.EntityFrameworkCore
+@using OrderStatus.Data
+@using OrderStatus.Data.Models
+@inject IDbContextFactory<BoardDbContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>@(Id is null ? "New order" : "Edit order") - Order Status Board</PageTitle>
+
+<h1>@(Id is null ? "New order" : "Edit order")</h1>
+
+@if (order is null)
+{
+    <p class="status-line">Loading...</p>
+}
+else
+{
+    <EditForm Model="order" OnValidSubmit="SaveAsync" FormName="order-form" class="order-form">
+        <DataAnnotationsValidator />
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+
+        <div class="form-row">
+            <label for="orderNumber">Order number</label>
+            <InputText id="orderNumber" class="form-control" @bind-Value="order.OrderNumber" />
+            <ValidationMessage For="() => order.OrderNumber" />
+        </div>
+
+        <div class="form-row">
+            <label for="customer">Customer</label>
+            <InputSelect id="customer" class="form-control" @bind-Value="order.CustomerId">
+                <option value="0">-- choose a customer --</option>
+                @foreach (var customer in customers)
+                {
+                    <option value="@customer.Id">@customer.Name</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => order.CustomerId" />
+        </div>
+
+        <div class="form-row">
+            <label for="state">Status</label>
+            <InputSelect id="state" class="form-control" @bind-Value="order.OrderStateId">
+                <option value="0">-- choose a status --</option>
+                @foreach (var state in states)
+                {
+                    <option value="@state.Id">@state.Name</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => order.OrderStateId" />
+        </div>
+
+        <div class="form-row">
+            <label for="channel">Channel</label>
+            <InputSelect id="channel" class="form-control" @bind-Value="order.Channel">
+                <option value="Shopify">Shopify</option>
+                <option value="Amazon">Amazon</option>
+                <option value="Walmart">Walmart</option>
+                <option value="eBay">eBay</option>
+                <option value="Phone">Phone</option>
+            </InputSelect>
+            <ValidationMessage For="() => order.Channel" />
+        </div>
+
+        <div class="form-row">
+            <label for="total">Total</label>
+            <InputNumber id="total" class="form-control" @bind-Value="order.Total" step="0.01" />
+            <ValidationMessage For="() => order.Total" />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                @(isSaving ? "Saving..." : "Save")
+            </button>
+            <a class="btn btn-secondary" href="orders">Cancel</a>
+
+            @if (Id is not null && !order.IsCancelled)
+            {
+                @if (confirmCancel)
+                {
+                    <span class="confirm-text">Cancel this order?</span>
+                    <button type="button" class="btn btn-danger btn-sm" @onclick="CancelOrderAsync">Yes, cancel it</button>
+                    <button type="button" class="btn btn-link btn-sm" @onclick="() => confirmCancel = false">Keep it</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger" @onclick="() => confirmCancel = true">Cancel order</button>
+                }
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private Order? order;
+    private List<Customer> customers = new();
+    private List<OrderState> states = new();
+    private string? errorMessage;
+    private bool isSaving;
+    private bool confirmCancel;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        customers = await db.Customers.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
+        states = await db.OrderStates.AsNoTracking().OrderBy(s => s.SortOrder).ToListAsync();
+
+        if (Id is null)
+        {
+            // A new order starts in the first board column.
+            order = new Order { OrderStateId = states.FirstOrDefault()?.Id ?? 0 };
+            return;
+        }
+
+        order = await db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == Id);
+
+        if (order is null)
+        {
+            // The id matched nothing. Send them back rather than showing a broken form.
+            Nav.NavigateTo("/orders");
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (order!.Id == 0)
+            {
+                db.Orders.Add(order);
+            }
+            else
+            {
+                db.Orders.Update(order);
+            }
+
+            await db.SaveChangesAsync();
+            Nav.NavigateTo("/orders");
+        }
+        catch (DbUpdateException)
+        {
+            // The unique index rejected it. Almost always a duplicate order number.
+            errorMessage = $"Order number '{order!.OrderNumber}' is already in use. Pick a different one.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CancelOrderAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var existing = await db.Orders.FirstOrDefaultAsync(o => o.Id == Id);
+
+        if (existing is not null)
+        {
+            // Hide it, do not destroy it. The board query already filters cancelled orders.
+            existing.IsCancelled = true;
+            await db.SaveChangesAsync();
+        }
+
+        Nav.NavigateTo("/orders");
+    }
+}
