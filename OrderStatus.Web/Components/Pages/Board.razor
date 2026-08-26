@@ -1,0 +1,145 @@
+@page "/orders"
+@using Microsoft.EntityFrameworkCore
+@using OrderStatus.Data
+@using OrderStatus.Data.Models
+@inject IDbContextFactory<BoardDbContext> DbFactory
+
+<PageTitle>Order board - Order Status Board</PageTitle>
+
+<div class="board-header">
+    <div>
+        <h1>Order board</h1>
+        @if (orders is not null)
+        {
+            <p class="status-line">
+                @orders.Count open @(orders.Count == 1 ? "order" : "orders") ·
+                @orders.Sum(o => o.Total).ToString("C") in the pipeline
+            </p>
+        }
+    </div>
+    <a class="btn btn-primary" href="orders/new">New order</a>
+</div>
+
+@if (orders is null || states is null)
+{
+    <p class="status-line">Loading...</p>
+}
+else if (orders.Count == 0)
+{
+    <div class="empty-state">
+        <p><strong>No open orders.</strong></p>
+        <p>Add an order and it will appear in the first column.</p>
+        <a class="btn btn-primary" href="orders/new">New order</a>
+    </div>
+}
+else
+{
+    <div class="board">
+        @foreach (var state in states)
+        {
+            var inState = orders.Where(o => o.OrderStateId == state.Id).ToList();
+            <section class="board-column" aria-label="@state.Name">
+                <header class="column-head" style="border-top-color:@state.Accent">
+                    <span class="column-name">@state.Name</span>
+                    <span class="column-count">@inState.Count</span>
+                </header>
+
+                @if (inState.Count == 0)
+                {
+                    <p class="column-empty">Nothing here</p>
+                }
+                else
+                {
+                    @foreach (var order in inState)
+                    {
+                        <article class="order-card">
+                            <a class="order-number" href="@($"orders/edit/{order.Id}")">@order.OrderNumber</a>
+                            <p class="order-customer">@order.Customer?.Name</p>
+                            <p class="order-meta">
+                                <span class="channel-tag">@order.Channel</span>
+                                <span class="order-total">@order.Total.ToString("C")</span>
+                            </p>
+                            <div class="order-actions">
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                        disabled="@(!CanMove(state, -1))"
+                                        title="Move back"
+                                        @onclick="() => MoveAsync(order.Id, -1)">&larr;</button>
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                        disabled="@(!CanMove(state, 1))"
+                                        title="Move forward"
+                                        @onclick="() => MoveAsync(order.Id, 1)">&rarr;</button>
+                            </div>
+                        </article>
+                    }
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private List<Order>? orders;
+    private List<OrderState>? states;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoardAsync();
+    }
+
+    // Its own method so the move and cancel actions can refresh by calling it.
+    private async Task LoadBoardAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        states = await db.OrderStates
+            .AsNoTracking()
+            .OrderBy(s => s.SortOrder)
+            .ToListAsync();
+
+        orders = await db.Orders
+            .AsNoTracking()
+            .Include(o => o.Customer)
+            .Include(o => o.OrderState)
+            .Where(o => !o.IsCancelled)
+            .OrderBy(o => o.PlacedUtc)
+            .ToListAsync();
+    }
+
+    // There is nowhere to move from the first column back, or the last forward.
+    private bool CanMove(OrderState state, int direction)
+    {
+        if (states is null)
+        {
+            return false;
+        }
+
+        return states.Any(s => s.SortOrder == state.SortOrder + direction);
+    }
+
+    private async Task MoveAsync(int orderId, int direction)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        var order = await db.Orders
+            .Include(o => o.OrderState)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+
+        if (order?.OrderState is null)
+        {
+            return;
+        }
+
+        // Look up the neighbouring column by SortOrder rather than by id - ids are
+        // not guaranteed to run in board order.
+        var target = await db.OrderStates
+            .FirstOrDefaultAsync(s => s.SortOrder == order.OrderState.SortOrder + direction);
+
+        if (target is not null)
+        {
+            order.OrderStateId = target.Id;
+            await db.SaveChangesAsync();
+        }
+
+        await LoadBoardAsync();
+    }
+}

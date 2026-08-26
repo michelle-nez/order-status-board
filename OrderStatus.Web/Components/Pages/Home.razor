@@ -1,0 +1,22 @@
+@page "/"
+
+<PageTitle>Order Status Board</PageTitle>
+
+<h1>Order Status Board</h1>
+
+<p class="lead">
+    See where every order stands. Place an order, move it along its lifecycle,
+    and read the whole pipeline at a glance.
+</p>
+
+<div class="home-panel">
+    <h2>What it does</h2>
+    <ul>
+        <li>Orders, customers, and statuses across three related SQL Server tables.</li>
+        <li>Status is a lookup table, so a stage is never typed two different ways.</li>
+        <li>A unique index on the order number, enforced by the database.</li>
+        <li>Cancelling an order hides it and keeps the record.</li>
+    </ul>
+
+    <a class="btn btn-primary" href="orders">Open the board</a>
+</div>
