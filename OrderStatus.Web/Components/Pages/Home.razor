@@ -2,21 +2,44 @@
 
 <PageTitle>Order Status Board</PageTitle>
 
-<h1>Order Status Board</h1>
+<MudText Typo="Typo.h4" Class="mb-2" Style="font-weight:700;letter-spacing:-.02em;">Order Status Board</MudText>
+<MudText Typo="Typo.subtitle1" Color="Color.Secondary" Class="mb-6" Style="max-width:46rem;">
+    See where every order stands. Place an order, move it along its lifecycle, and
+    read the whole pipeline at a glance.
+</MudText>
 
-<p class="lead">
-    See where every order stands. Place an order, move it along its lifecycle,
-    and read the whole pipeline at a glance.
-</p>
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-5 h-100" Style="border:1px solid var(--mud-palette-divider);">
+            <MudIcon Icon="@Icons.Material.Outlined.TableChart" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Three related tables</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Orders, customers and statuses in SQL Server.</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-5 h-100" Style="border:1px solid var(--mud-palette-divider);">
+            <MudIcon Icon="@Icons.Material.Outlined.List" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Status is a lookup</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">A stage is never typed two different ways.</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-5 h-100" Style="border:1px solid var(--mud-palette-divider);">
+            <MudIcon Icon="@Icons.Material.Outlined.Key" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Unique order number</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Enforced by the database, not the screen.</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="0" Class="pa-5 h-100" Style="border:1px solid var(--mud-palette-divider);">
+            <MudIcon Icon="@Icons.Material.Outlined.History" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Soft cancel</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Cancelling hides an order and keeps the record.</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
-<div class="home-panel">
-    <h2>What it does</h2>
-    <ul>
-        <li>Orders, customers, and statuses across three related SQL Server tables.</li>
-        <li>Status is a lookup table, so a stage is never typed two different ways.</li>
-        <li>A unique index on the order number, enforced by the database.</li>
-        <li>Cancelling an order hides it and keeps the record.</li>
-    </ul>
-
-    <a class="btn btn-primary" href="orders">Open the board</a>
-</div>
+<MudButton Href="/orders" Variant="Variant.Filled" Color="Color.Primary" Class="mt-6"
+           EndIcon="@Icons.Material.Outlined.ArrowForward">
+    Open the board
+</MudButton>

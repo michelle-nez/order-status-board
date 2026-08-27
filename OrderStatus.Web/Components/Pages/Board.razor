@@ -6,70 +6,77 @@
 
 <PageTitle>Order board - Order Status Board</PageTitle>
 
-<div class="board-header">
+<div class="d-flex flex-wrap align-center justify-space-between mb-5 gap-3">
     <div>
-        <h1>Order board</h1>
+        <MudText Typo="Typo.h5">Order board</MudText>
         @if (orders is not null)
         {
-            <p class="status-line">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
                 @orders.Count open @(orders.Count == 1 ? "order" : "orders") ·
                 @orders.Sum(o => o.Total).ToString("C") in the pipeline
-            </p>
+            </MudText>
         }
     </div>
-    <a class="btn btn-primary" href="orders/new">New order</a>
 </div>
 
 @if (orders is null || states is null)
 {
-    <p class="status-line">Loading...</p>
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
 }
 else if (orders.Count == 0)
 {
-    <div class="empty-state">
-        <p><strong>No open orders.</strong></p>
-        <p>Add an order and it will appear in the first column.</p>
-        <a class="btn btn-primary" href="orders/new">New order</a>
-    </div>
+    <MudPaper Elevation="0" Class="pa-10 d-flex flex-column align-center"
+              Style="border:1px dashed var(--mud-palette-divider);">
+        <MudIcon Icon="@Icons.Material.Outlined.Inbox" Size="Size.Large" Color="Color.Secondary" />
+        <MudText Typo="Typo.h6" Class="mt-3">No open orders</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            Add an order and it will appear in the first column.
+        </MudText>
+        <MudButton Href="/orders/new" Variant="Variant.Filled" Color="Color.Primary">New order</MudButton>
+    </MudPaper>
 }
 else
 {
-    <div class="board">
+    <div class="board-scroll">
         @foreach (var state in states)
         {
             var inState = orders.Where(o => o.OrderStateId == state.Id).ToList();
-            <section class="board-column" aria-label="@state.Name">
-                <header class="column-head" style="border-top-color:@state.Accent">
-                    <span class="column-name">@state.Name</span>
-                    <span class="column-count">@inState.Count</span>
-                </header>
+            <section class="board-column">
+                <div class="column-head" style="border-top:3px solid @state.Accent;">
+                    <MudText Typo="Typo.subtitle2">@state.Name</MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                        @inState.Count
+                    </MudChip>
+                </div>
 
                 @if (inState.Count == 0)
                 {
-                    <p class="column-empty">Nothing here</p>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-2">Nothing here</MudText>
                 }
                 else
                 {
                     @foreach (var order in inState)
                     {
-                        <article class="order-card">
-                            <a class="order-number" href="@($"orders/edit/{order.Id}")">@order.OrderNumber</a>
-                            <p class="order-customer">@order.Customer?.Name</p>
-                            <p class="order-meta">
-                                <span class="channel-tag">@order.Channel</span>
-                                <span class="order-total">@order.Total.ToString("C")</span>
-                            </p>
-                            <div class="order-actions">
-                                <button type="button" class="btn btn-ghost btn-sm"
-                                        disabled="@(!CanMove(state, -1))"
-                                        title="Move back"
-                                        @onclick="() => MoveAsync(order.Id, -1)">&larr;</button>
-                                <button type="button" class="btn btn-ghost btn-sm"
-                                        disabled="@(!CanMove(state, 1))"
-                                        title="Move forward"
-                                        @onclick="() => MoveAsync(order.Id, 1)">&rarr;</button>
+                        <MudPaper Elevation="0" Class="pa-3 mb-2"
+                                  Style="border:1px solid var(--mud-palette-divider);">
+                            <MudLink Href="@($"/orders/edit/{order.Id}")" Typo="Typo.body2"
+                                     Style="font-family:Consolas,monospace;font-weight:600;">
+                                @order.OrderNumber
+                            </MudLink>
+                            <MudText Typo="Typo.body2" Class="mt-1">@order.Customer?.Name</MudText>
+                            <div class="d-flex align-center justify-space-between mt-2">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@order.Channel</MudChip>
+                                <MudText Typo="Typo.body2" Style="font-weight:700;">@order.Total.ToString("C")</MudText>
                             </div>
-                        </article>
+                            <div class="d-flex justify-end mt-1">
+                                <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" Size="Size.Small"
+                                               Disabled="@(!CanMove(state, -1))" aria-label="Move back"
+                                               OnClick="@(() => MoveAsync(order.Id, -1))" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" Size="Size.Small"
+                                               Disabled="@(!CanMove(state, 1))" aria-label="Move forward"
+                                               OnClick="@(() => MoveAsync(order.Id, 1))" />
+                            </div>
+                        </MudPaper>
                     }
                 }
             </section>
@@ -86,7 +93,7 @@ else
         await LoadBoardAsync();
     }
 
-    // Its own method so the move and cancel actions can refresh by calling it.
+    // Its own method so the move action can refresh by calling it.
     private async Task LoadBoardAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
@@ -106,15 +113,8 @@ else
     }
 
     // There is nowhere to move from the first column back, or the last forward.
-    private bool CanMove(OrderState state, int direction)
-    {
-        if (states is null)
-        {
-            return false;
-        }
-
-        return states.Any(s => s.SortOrder == state.SortOrder + direction);
-    }
+    private bool CanMove(OrderState state, int direction) =>
+        states is not null && states.Any(s => s.SortOrder == state.SortOrder + direction);
 
     private async Task MoveAsync(int orderId, int direction)
     {

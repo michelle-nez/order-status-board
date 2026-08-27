@@ -1,20 +1,38 @@
+@using OrderStatus.Web
 @inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<MudThemeProvider Theme="BoardTheme.Theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://github.com/michelle-nez/order-status-board" target="_blank">Source on GitHub</a>
-        </div>
+@* No drawer on this one - the nav sits in the bar, so the board gets the full
+   width. Each app in the portfolio uses a different layout shape on purpose. *@
+<MudLayout>
+    <MudAppBar Elevation="0" Dense="true"
+               Style="border-bottom:1px solid var(--mud-palette-divider);">
+        <MudIcon Icon="@Icons.Material.Outlined.ViewKanban" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6" Color="Color.Primary">Order Status Board</MudText>
 
-        <article class="content px-4">
+        <MudSpacer />
+
+        <MudButton Href="/" Variant="Variant.Text" Color="Color.Default" Class="d-none d-sm-flex">Home</MudButton>
+        <MudButton Href="/orders" Variant="Variant.Text" Color="Color.Default" Class="d-none d-sm-flex">Board</MudButton>
+        <MudButton Href="/orders/new" Variant="Variant.Filled" Color="Color.Primary" Class="ml-2"
+                   StartIcon="@Icons.Material.Outlined.Add">
+            New order
+        </MudButton>
+        <MudIconButton Href="https://github.com/michelle-nez/order-status-board" Target="_blank"
+                       Icon="@Icons.Custom.Brands.GitHub" Color="Color.Default" Class="ml-1" />
+    </MudAppBar>
+
+    @* No pt-* class here - that would override the offset that clears the fixed AppBar. *@
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-6 pb-10">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
