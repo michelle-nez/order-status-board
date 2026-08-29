@@ -1,98 +1,122 @@
 # Order Status Board
 
-See where every order stands. Place an order, move it along its lifecycle, and
-read the whole pipeline at a glance. Built to practice EF Core relationships and
+See where every order stands. Place an order, move it along its lifecycle, and read
+the whole pipeline at a glance. Built to demonstrate EF Core relationships and
 lookup-table design on SQL Server.
 
 ![Order board](screenshots/order-board.png)
 
-## Stack
+## The problem it solves
 
-- .NET 10, Blazor Server (interactive server rendering)
-- Entity Framework Core 10
-- SQL Server (LocalDB in development)
+Order status usually lives in a spreadsheet column that anyone can type into, so the
+same stage ends up recorded as "Shipped", "shipped" and "Shiped" — and no query can
+group them again. This app makes the set of valid stages a **database constraint**:
 
-## What it does
+- Status is a **lookup table**, not free text, so a stage cannot be misspelled into existence
+- Each stage carries a `SortOrder`, so the board's column order is data rather than markup
+- Renaming a stage is one row update, not a bulk string replace
+- Cancelling an order **hides it and keeps the row**, so history survives
 
-- Orders, customers, and statuses across three related SQL Server tables
-- Status is a **lookup table**, so a stage is never typed two different ways
-- Board columns are driven by the lookup's `SortOrder`, not hard-coded in markup
-- Move an order forward or back a column; the end columns disable the arrow that
-  has nowhere to go
-- Unique index on the order number, enforced by the database rather than the screen
-- Cancelling an order hides it and keeps the record
-- Responsive - the columns stack instead of scrolling sideways on a phone
+## Features
 
-## The schema
+Implemented today:
 
-```
-dbo.Customers
-    Id          int, primary key, identity
-    Name        nvarchar(120), not null
-    Email       nvarchar(200), not null
+- A board with one column per status, generated from the lookup table
+- Move an order forward or back a column; the end columns disable the arrow that has nowhere to go
+- Add and edit orders, with server-side validation from data annotations
+- Duplicate order numbers rejected by a unique index
+- Cancel an order behind a two-step confirm (soft delete)
+- A running count and pipeline total above the board
+- Responsive — columns stack instead of scrolling sideways at phone width
 
-dbo.OrderStates                      -- the lookup
-    Id          int, primary key, identity
-    Name        nvarchar(40), not null
-    SortOrder   int, not null        -- drives the board column order
-    Accent      nvarchar(20), not null
+Not implemented: search, filtering, paging, authentication, order lines, and a screen
+for cancelled orders. See [Project status](#project-status).
 
-dbo.Orders
-    Id            int, primary key, identity
-    OrderNumber   nvarchar(40), not null, UNIQUE index
-    Total         decimal(18,2), not null
-    Channel       nvarchar(40), not null
-    PlacedUtc     datetime2, not null
-    IsCancelled   bit, not null
-    CustomerId    int, not null, foreign key -> Customers.Id
-    OrderStateId  int, not null, foreign key -> OrderStates.Id
-```
+![New and edit order form](screenshots/order-form.png)
 
-`Total` is `decimal(18,2)`, not a floating point type - money has to be exact.
-Both foreign keys use `DeleteBehavior.Restrict`, so a customer or a status that
-still has orders pointing at it cannot be deleted out from under them. The status
-list and a few customers are seeded by the migration, so the board has its columns
-on a fresh database.
+## Technology stack
 
-## Why a lookup table
-
-Storing the stage as free text means "Shipped", "shipped", and "Shiped" all end up
-in the same column of the same table, and no query can group them. A lookup table
-makes the set of valid stages a database constraint, gives each one a stable
-`SortOrder` for display, and means renaming a stage is one row update rather than a
-bulk string replace.
-
-## Project layout
-
-| Project | What it holds |
+| Layer | Choice |
 |---|---|
-| `OrderStatus.Web` | Blazor Server app - the screens |
-| `OrderStatus.Data` | Models, `BoardDbContext`, and EF Core migrations |
+| Framework | .NET 10, Blazor Server (Interactive Server rendering) |
+| UI | MudBlazor 9.9.0 |
+| Data access | Entity Framework Core 10 |
+| Database | SQL Server — LocalDB in development |
 
-The reference points one way only: Web references Data, never the reverse. The
-context is registered with `AddDbContextFactory`, not `AddDbContext`, because
-Blazor Server components are long-lived and several can run at once.
+**There is no HTTP API in this project, and no Swagger/OpenAPI.** It is a
+server-rendered Blazor application: the Razor components query EF Core directly
+through an injected `IDbContextFactory<BoardDbContext>`. There are no controllers or
+minimal-API endpoints to call from outside the app.
 
-## Running it locally
+## Solution structure
+
+| Project | Holds |
+|---|---|
+| `OrderStatus.Web` | Blazor Server app — the board, the order form, layout and startup |
+| `OrderStatus.Data` | `BoardDbContext`, the `Order`, `Customer` and `OrderState` models, EF Core migrations |
+
+The project reference points **one way only**: Web references Data, never the reverse.
+
+The context is registered with `AddDbContextFactory`, not `AddDbContext`. Blazor
+Server components are long-lived and several can run at once, so each operation
+creates its own short-lived context instead of sharing one.
+
+## Requirements
+
+- Visual Studio 2026 with the ASP.NET and web development workload
+- .NET 10 SDK
+- SQL Server LocalDB (installed with that workload) — or any SQL Server instance
+
+## Getting it running
 
 1. Open `OrderStatusBoard.sln` in Visual Studio 2026.
-2. Right-click `OrderStatus.Web` and choose **Manage User Secrets**.
-3. Add a `ConnectionStrings:BoardDatabase` value pointing at your local SQL Server
-   LocalDB instance, with the database named `OrderStatusBoard` and a trusted
-   connection. See `appsettings.json` for the setting's shape.
-4. In the Package Manager Console, set **Default project** to `OrderStatus.Data`
-   and run `Update-Database`.
-5. Run the project and open `/orders`.
+2. Right-click **`OrderStatus.Web`** → **Manage User Secrets**, and add a connection
+   string named `BoardDatabase` pointing at your LocalDB instance
+   (`(localdb)\MSSQLLocalDB`) with the database named `OrderStatusBoard`.
+   `appsettings.json` keeps the key with a blank value so the shape is documented
+   without a credential in the repository.
+3. Apply the migration. In **Package Manager Console** set **Default project** to
+   `OrderStatus.Data` **and** make sure the **startup project is `OrderStatus.Web`** —
+   the EF Core tools and the connection string both live there — then run:
 
-The connection string lives in User Secrets only. `appsettings.json` keeps a blank
-placeholder so the setting's shape is documented without a value in the repo.
+   ```powershell
+   Update-Database
+   ```
 
-## What I would do next
+4. Press F5 and open `/orders`.
+
+The database is **not** created automatically at startup; step 3 is required on a
+fresh clone. Five statuses and three customers are seeded by the migration, so the
+board has its columns and the customer dropdown is never empty on first run.
+
+The CLI equivalent of step 3, and what to do when it fails, is in
+[docs/database.md](docs/database.md#migrations).
+
+## Documentation
+
+| Document | Covers |
+|---|---|
+| [docs/database.md](docs/database.md) | Schema, entities, relationships, the lookup table, migrations, seed data, ER diagram |
+
+Being written next: architecture, getting started, configuration, and troubleshooting.
+
+## Project status
+
+Working and complete for what it sets out to prove: three related tables, two foreign
+keys, a lookup table driving the UI, and a board that reads and writes. It is a
+portfolio project rather than a product, and is not deployed to a public URL — it runs
+locally against LocalDB.
+
+What I would add next:
 
 - Filter the board by channel or customer
 - A view for cancelled orders, with a way to reinstate one
 - Order lines, so an order is master-detail rather than a single total
 - Unit tests over the move logic
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
