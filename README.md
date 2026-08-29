@@ -89,16 +89,18 @@ The database is **not** created automatically at startup; step 3 is required on 
 fresh clone. Five statuses and three customers are seeded by the migration, so the
 board has its columns and the customer dropdown is never empty on first run.
 
-The CLI equivalent of step 3, and what to do when it fails, is in
-[docs/database.md](docs/database.md#migrations).
+Full setup detail, including the CLI equivalent of every step, is in
+[docs/getting-started.md](docs/getting-started.md).
 
 ## Documentation
 
 | Document | Covers |
 |---|---|
+| [docs/getting-started.md](docs/getting-started.md) | Setup from a fresh clone, how to verify it works, current deployment state |
+| [docs/architecture.md](docs/architecture.md) | Projects, layers, rendering model, how the lookup table drives the board |
 | [docs/database.md](docs/database.md) | Schema, entities, relationships, the lookup table, migrations, seed data, ER diagram |
 
-Being written next: architecture, getting started, configuration, and troubleshooting.
+Being written next: configuration and troubleshooting.
 
 ## Project status
 

@@ -1,10 +1,12 @@
-@page "/orders/new"
+﻿@page "/orders/new"
 @page "/orders/edit/{Id:int}"
 @using Microsoft.EntityFrameworkCore
 @using OrderStatus.Data
 @using OrderStatus.Data.Models
+@using Microsoft.Data.SqlClient
 @inject IDbContextFactory<BoardDbContext> DbFactory
 @inject NavigationManager Nav
+@inject ILogger<OrderEdit> Logger
 
 <PageTitle>@(Id is null ? "New order" : "Edit order") - Order Status Board</PageTitle>
 
@@ -123,6 +125,12 @@ else
         }
     }
 
+    // SQL Server reports a unique index or unique constraint violation as error
+    // 2601 or 2627. Matching on the number keeps the duplicate message tied to the
+    // one failure it actually describes.
+    private static bool IsDuplicateOrderNumber(DbUpdateException ex) =>
+        ex.InnerException is SqlException sql && (sql.Number == 2601 || sql.Number == 2627);
+
     private async Task SaveAsync()
     {
         errorMessage = null;
@@ -144,10 +152,17 @@ else
             await db.SaveChangesAsync();
             Nav.NavigateTo("/orders");
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsDuplicateOrderNumber(ex))
         {
-            // The unique index rejected it. Almost always a duplicate order number.
             errorMessage = $"Order number '{order!.OrderNumber}' is already in use. Pick a different one.";
+        }
+        catch (DbUpdateException ex)
+        {
+            // Any other save failure - a timeout, a dropped connection, a foreign key
+            // violation. Reporting these as a duplicate order number sends people
+            // looking in the wrong place, so say something honest and log the cause.
+            Logger.LogError(ex, "Failed to save order {OrderNumber}", order!.OrderNumber);
+            errorMessage = "Could not save this order. Please try again.";
         }
         finally
         {
